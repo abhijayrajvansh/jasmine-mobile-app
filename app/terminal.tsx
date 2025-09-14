@@ -11,12 +11,12 @@ import { testBridge } from '@/lib/bridge';
 export default function TerminalConnectScreen() {
   const router = useRouter();
   const params = useLocalSearchParams<{ host?: string; port?: string; username?: string }>();
-  const [host, setHost] = useState(params.host ?? '');
+  const [host, setHost] = useState(params.host ?? '192.168.29.161');
   const [port, setPort] = useState(params.port ?? '22');
-  const [username, setUsername] = useState(params.username ?? '');
-  const [password, setPassword] = useState('');
+  const [username, setUsername] = useState(params.username ?? 'abhijayrajvansh');
+  const [password, setPassword] = useState('abhi8709247743');
   const [useDirect, setUseDirect] = useState(isNativeSshAvailable());
-  const [bridgeUrl, setBridgeUrl] = useState('ws://localhost:8080/ws/ssh');
+  const [bridgeUrl, setBridgeUrl] = useState('ws://192.168.29.161:8080/ws/ssh');
   const [alias, setAlias] = useState('');
   const [saveHost, setSaveHost] = useState(true);
   const [savePwd, setSavePwd] = useState(false);
