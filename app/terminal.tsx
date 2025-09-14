@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from 'react';
-import { KeyboardAvoidingView, Platform, StyleSheet, TextInput, TouchableOpacity } from 'react-native';
+import { KeyboardAvoidingView, Platform, StyleSheet, TextInput, TouchableOpacity, View as RNView, Switch } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Text, View } from '@/components/Themed';
 
@@ -9,17 +9,24 @@ export default function TerminalConnectScreen() {
   const [port, setPort] = useState('22');
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
+  const [useDirect, setUseDirect] = useState(true);
   const [bridgeUrl, setBridgeUrl] = useState('ws://localhost:8080/ws/ssh');
 
   const valid = useMemo(() => host.trim().length > 0 && username.trim().length > 0 && password.length > 0 && /^\d+$/.test(port), [host, port, username, password]);
 
   function onConnect() {
     if (!valid) return;
-    router.push({
-      // Cast to any to satisfy typed routes until expo-router regenerates types
-      pathname: '/terminal/session',
-      params: { host: host.trim(), port: port.trim(), username: username.trim(), password, bridgeUrl: bridgeUrl.trim() },
-    } as any);
+    const base = {
+      host: host.trim(),
+      port: port.trim(),
+      username: username.trim(),
+      password,
+    };
+    if (useDirect) {
+      router.push({ pathname: '/terminal/native-session', params: base } as any);
+    } else {
+      router.push({ pathname: '/terminal/session', params: { ...base, bridgeUrl: bridgeUrl.trim() } } as any);
+    }
   }
 
   return (
@@ -37,8 +44,16 @@ export default function TerminalConnectScreen() {
       <Text style={styles.label}>Password</Text>
       <TextInput placeholder="••••••••" value={password} onChangeText={setPassword} secureTextEntry style={styles.input} />
 
-      <Text style={styles.help}>Bridge WebSocket URL (agent):</Text>
-      <TextInput placeholder="ws://localhost:8080/ws/ssh" value={bridgeUrl} onChangeText={setBridgeUrl} autoCapitalize="none" autoCorrect={false} style={styles.input} />
+      <RNView style={styles.row}>
+        <Text style={{ fontWeight: '500', flex: 1 }}>Use Direct SSH (no agent)</Text>
+        <Switch value={useDirect} onValueChange={setUseDirect} />
+      </RNView>
+      {!useDirect && (
+        <>
+          <Text style={styles.help}>Bridge WebSocket URL (agent):</Text>
+          <TextInput placeholder="ws://localhost:8080/ws/ssh" value={bridgeUrl} onChangeText={setBridgeUrl} autoCapitalize="none" autoCorrect={false} style={styles.input} />
+        </>
+      )}
 
       <TouchableOpacity disabled={!valid} onPress={onConnect} style={[styles.button, !valid && styles.buttonDisabled]}>
         <Text style={styles.buttonText}>Connect</Text>
@@ -53,6 +68,7 @@ const styles = StyleSheet.create({
   label: { fontWeight: '500' },
   input: { borderWidth: 1, borderColor: '#ccc', borderRadius: 8, padding: 12 },
   help: { fontSize: 12, opacity: 0.8 },
+  row: { flexDirection: 'row', alignItems: 'center', gap: 12, marginTop: 8 },
   button: { backgroundColor: '#2f95dc', paddingVertical: 12, borderRadius: 8, alignItems: 'center', marginTop: 12 },
   buttonDisabled: { opacity: 0.5 },
   buttonText: { color: '#fff', fontWeight: '600' },

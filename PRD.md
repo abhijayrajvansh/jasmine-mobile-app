@@ -1,5 +1,7 @@
 ---
 
+> Note: Updated to support direct SSH from the mobile app. The agent is optional. If you prefer no local agent, the app can connect to a computer on the same LAN via SSH (username/password) and present a terminal UI. The legacy agent flow remains as a fallback when using the WebSocket bridge.
+
 # 0) What you’ll get (local MVP behavior)
 
 1. Mobile app (Expo) sends a run request to your **backend stub**.
@@ -28,7 +30,7 @@
 * If you want to keep the same API shape (`/runs`, `/runs/:id/stream`, `/approve`), run a tiny Express server *on your laptop*.
 * For MVP you could even **skip backend** and call agent API directly from the mobile app.
 
-**Agent (local Node.js daemon)**
+**Agent (local Node.js daemon) — optional in direct-SSH mode**
 
 * Runs on your laptop.
 * Listens on `http://0.0.0.0:8080` (so mobile devices on Wi-Fi can reach it).
@@ -41,7 +43,14 @@
 
 ---
 
-# 2) Flow (local execution)
+# 2) Flow (direct SSH execution)
+
+1. Ensure the target computer has SSH enabled and reachable on port 22, and that your phone is on the same Wi‑Fi/LAN.
+2. In the app, open SSH Terminal, enter host, username, and password, and connect. You’ll get an interactive terminal to the remote machine.
+
+---
+
+# 2b) Flow (agent bridge execution — legacy)
 
 1. **Start local agent**:
 

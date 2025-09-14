@@ -58,6 +58,7 @@ function RootLayoutNav() {
           <Stack.Screen name="connect" options={{ title: 'Connect' }} />
           <Stack.Screen name="terminal" options={{ title: 'SSH Terminal' }} />
           <Stack.Screen name="terminal/session" options={{ title: 'Session' }} />
+          <Stack.Screen name="terminal/native-session" options={{ title: 'Direct SSH' }} />
           <Stack.Screen name="run/new" options={{ title: 'New Run' }} />
           <Stack.Screen name="run/[id]" options={{ title: 'Run' }} />
           <Stack.Screen name="run/[id]/diff" options={{ title: 'Diff' }} />
