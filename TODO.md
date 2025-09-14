@@ -1,6 +1,6 @@
-# Mobile App TODO
+# Mobile App TODO — Remote Terminal
 
-This is the implementation plan for the local-first mobile app (Expo) that talks directly to the laptop‑hosted agent over LAN HTTP, per PRD.md and UX.md. The scope covers an MVP that proves the run loop: compose → stream → diff → approve → apply/push.
+Implementation plan for the mobile app that connects to a computer over LAN and provides a fully interactive remote terminal, per UX.md. Focus: capture host credentials, establish an SSH PTY session, and deliver a first-class terminal experience on mobile.
 
 Link references:
 - PRD: `PRD.md`
@@ -8,262 +8,243 @@ Link references:
 
 ## Milestones
 
-1) Foundation & Connectivity
-2) Run Composer
-3) Run Detail (Live)
-4) Diff & Approve
-5) Apply & Success
-6) Settings & Diagnostics
-7) Testing & QA
-8) Polishing, Performance, and Docs
+1) Foundation & Welcome
+2) Connect to Computer
+3) Session Establishment (SSH + PTY)
+4) Terminal Screen & Interactions
+5) Command Execution Parity
+6) Disconnect & Persistence
+7) Settings & Diagnostics
+8) Testing & QA
+9) Performance, Accessibility & Docs
 
-Each milestone has acceptance criteria to ensure end‑to‑end functionality.
+Each milestone has clear acceptance criteria.
 
 ---
 
-## 1) Foundation & Connectivity
+## 1) Foundation & Welcome
 
 - Project setup
   - [ ] Confirm Expo SDK and React Native versions (managed workflow).
-  - [ ] Add base navigation using `expo-router` (ensure `_layout.tsx` defines a root stack).
-  - [ ] Create route stubs: `app/connect.tsx`, `app/run/new.tsx`, `app/run/[id].tsx`, `app/run/[id]/diff.tsx`, `app/settings.tsx`.
-  - [ ] Implement global theme support (light/dark) with system detection.
+  - [ ] Base navigation with `expo-router` (root stack in `_layout.tsx`).
+  - [ ] Route stubs: `app/index.tsx` (Welcome), `app/connect.tsx`, `app/terminal/index.tsx`, `app/settings.tsx`.
+  - [ ] Global light/dark theme with system detection.
 
-- Configuration
-  - [ ] Create `constants/config.ts` with persisted `agentBaseUrl` and helpers.
-  - [ ] Persist/retrieve settings using `expo-secure-store` (preferred) or `AsyncStorage` fallback.
-  - [ ] Add simple in‑app “Connected” indicator sourced from settings/context.
+- Storage & context
+  - [ ] App context for session and saved hosts list.
+  - [ ] Secure storage for secrets using `expo-secure-store`; fall back to `AsyncStorage` for non-secrets.
 
-- Networking & platform quirks
-  - [ ] Install and wire an SSE client compatible with React Native: `react-native-sse` (or equivalent polyfill) for `/runs/:id/stream`.
-  - [ ] Implement fetch wrapper with timeouts, JSON/text handling, and error normalization.
-  - [ ] Android: allow cleartext HTTP for LAN (Expo `app.json` → `android.usesCleartextTraffic: true`).
-  - [ ] iOS: add helpful diagnostics for CORS/network issues; consider `NSLocalNetworkUsageDescription` if needed.
-
-- Connect screen (per UX Stage 1)
-  - [ ] UI: input for `Agent URL` with validation and helper text.
-  - [ ] Action: test connection by calling `GET /` (or fallback `GET /runs/:fake/state`).
-  - [ ] Store URL on success; show success toast and navigate to Run Composer.
-  - [ ] Error states: unreachable, timeout, wrong port; actionable guidance.
-  - [ ] “Recent agents” quick chips; delete from recents.
+- Welcome screen (UX Stage 1)
+  - [ ] CTA: "Connect to Computer"; list "Saved Hosts" with quick connect and delete.
+  - [ ] Help link: "How to find my IP" modal.
 
 Acceptance criteria
-- [ ] From a fresh install, user can set `http://<LAN-IP>:8080`, test, and persist connection.
-- [ ] Connection test distinguishes network vs. CORS vs. 404 errors with clear messages.
+- [ ] App launches to Welcome; Saved Hosts visible when present; navigation works.
 
 ---
 
-## 2) Run Composer
+## 2) Connect to Computer
 
-- UI & validation
-  - [ ] Screen: `New Run` with fields: Repo URL (required), Base Branch (default `main`), Prompt (required, multiline).
-  - [ ] Advanced: Branch prefix (readonly or configurable), allow force‑push (off), labels/tags (optional).
-  - [ ] Disable submit until inputs are valid. Provide inline hints and examples.
+- UI & validation (UX Stage 2)
+  - [ ] Fields: Host/IP, Port (default 22), Username, Password; optional Alias; Save toggle.
+  - [ ] Validate IPv4/IPv6/hostname; port 1–65535; non-empty user/password.
+  - [ ] Unknown host key prompt flow (fingerprint confirm) placeholder.
 
-- API integration
-  - [ ] POST `${BASE_URL}/runs` with `{ repoUrl, baseBranch, prompt }`.
-  - [ ] On success, navigate to Run Detail with returned `{ runId }` and an initial `RUNNING` state.
-  - [ ] Persist last used repo URL and base branch (not prompt).
+- Security & storage
+  - [ ] Never log the password; mask input with reveal toggle.
+  - [ ] Save alias/host/port/username and host key fingerprint when trusted.
+  - [ ] Optionally save password in secure store if user opts in.
 
-- UX polish
-  - [ ] Keyboard behavior for multiline prompt; submit button focus behavior.
-  - [ ] Helpful sample prompts.
+- Connect action
+  - [ ] Show progress state with timeout (e.g., 8s).
+  - [ ] On success, navigate to Terminal screen.
+  - [ ] On failure, surface specific errors: unreachable, auth failed, port closed, host key mismatch.
 
 Acceptance criteria
-- [ ] Valid submissions reliably create runs and transition to Run Detail.
-- [ ] Errors from the agent are surfaced with clear, actionable text.
+- [ ] Valid inputs enable Connect; success transitions to Terminal; errors are actionable.
 
 ---
 
-## 3) Run Detail (Live)
+## 3) Session Establishment (SSH + PTY)
 
-- Data model & state
-  - [ ] Define `RunState` type (`RUNNING | NEEDS_APPROVAL | APPLYING | SUCCEEDED | FAILED`) and metadata.
-  - [ ] Implement a run store (Context or Zustand) to hold live state and logs.
+- Transport options (select one for MVP; keep others as fallback plans)
+  - [ ] A) Native SSH library for React Native (evaluate `react-native-ssh-sftp` or maintained alternatives) to open SSH with password auth and request PTY.
+  - [ ] B) WebView + xterm.js + WebSocket bridge hosted on the target computer (dev-only helper) that proxies to a PTY (e.g., Node `ssh2` or local shell). Requires user to run a helper on the host during MVP.
+  - [ ] C) WASM-based SSH client rendered in WebView (evaluate feasibility/perf).
 
-- Streaming
-  - [ ] Subscribe to SSE: `GET /runs/:id/stream` using SSE client; handle `log` and `state` events.
-  - [ ] Implement exponential backoff reconnect; fall back to polling `GET /runs/:id/state` every 2s when SSE fails.
-  - [ ] Retain last 1,000 log lines; use a virtualized list for performance; auto‑scroll with pause.
-
-- UI
-  - [ ] Header with runId, status chip, elapsed time.
-  - [ ] Timeline: Clone → Edit → Diff Ready → Await Approval → Applying → Pushed.
-  - [ ] Logs panel with search, copy‑all, and clear.
-  - [ ] CTA to view Diff, disabled until `NEEDS_APPROVAL` (shows files changed count when available).
-
-- Actions
-  - [ ] Cancel Run (if supported by agent; otherwise, hide or disable with tooltip).
-  - [ ] Retry Connection button to force SSE reconnect.
+- PTY/session
+  - [ ] On connect, request PTY (`xterm-256color`) sized to device; send resize events.
+  - [ ] Keep-alive pings and reconnect strategy on transient loss.
 
 Acceptance criteria
-- [ ] Live logs stream smoothly; SSE reconnects automatically; polling fallback works.
-- [ ] Status transitions drive UI (buttons enabled/disabled appropriately).
+- [ ] Session opens a shell ready for input; terminal screen receives bytes and renders output.
 
 ---
 
-## 4) Diff & Approve
+## 4) Terminal Screen & Interactions
 
-- Data
-  - [ ] Fetch unified patch: `GET /runs/:id/diff` as `text/plain`.
-  - [ ] Parse to hunks/files; compute summary (files changed, insertions, deletions).
+- Rendering
+  - [ ] Use `react-native-webview` to embed xterm.js with ANSI support, or a native RN terminal component if available and mature.
+  - [ ] Scrollback buffer with virtualization (target 5–10k lines).
 
-- UI
-  - [ ] File list with badges A/M/D and per‑file counts.
-  - [ ] Diff viewer with unified and side‑by‑side modes; word wrap toggle; whitespace toggle; inline search.
-  - [ ] Summary bar with totals and “Download .patch” / “Copy Patch”.
+- Controls
+  - [ ] On-screen accessory keys: Esc, Ctrl (latch), Tab, arrows, `|`, `~`, `/`, `\\`, `:`.
+  - [ ] Copy/paste with confirmation for multiline pastes.
+  - [ ] Tabs: new tab, rename, switch, close (confirm when job running).
 
-- Actions
-  - [ ] Approve & Push → `POST /runs/:id/approve`, then navigate back to Run Detail and show `APPLYING` state.
-  - [ ] Back to Logs; Retry with New Prompt (returns to Composer with previous fields filled).
-
-- Performance
-  - [ ] Virtualize long diffs; progressive render for large patches.
+- UI polish
+  - [ ] Header: `<alias|username@host>` with status chip and latency indicator.
+  - [ ] Theme presets (Light/Dark/Solarized/Monokai); font size slider.
+  - [ ] Haptics for connect/disconnect/error; blinking cursor option.
 
 Acceptance criteria
-- [ ] Full patch is viewable and navigable; toggles are presentation‑only (no partial apply).
-- [ ] Approval triggers apply/commit/push on the agent and the UI reflects progress.
+- [ ] Users can type commands, see output with correct colors, scroll history, and manage tabs.
 
 ---
 
-## 5) Apply & Success
+## 5) Command Execution Parity
 
-- Applying
-  - [ ] Show progress steps: Apply patch → Commit → Push, with live updates.
-  - [ ] Disable destructive actions during apply; allow “Back to Logs”.
+- Behavior
+  - [ ] Raw keystroke streaming; support interactive apps (vim, top, htop, nano, ssh nesting).
+  - [ ] Render bold/underline, cursor movements, and alternate screen buffers.
+  - [ ] Backpressure handling to prevent UI jank on large outputs.
 
-- Success
-  - [ ] Show success banner with branch name, commit message, short SHA, and change summary.
-  - [ ] Actions: Open on GitHub (when remote is available), Copy branch name, Start another run.
-  - [ ] Persist summary locally so it survives backgrounding.
-
-- Errors
-  - [ ] Push rejected (auth/branch protection): explain and offer “Retry Push” or guidance.
-  - [ ] Non‑fast‑forward: suggest rebase flow or new branch.
+- Utilities
+  - [ ] Clear screen (`Ctrl+L`) shortcut; copy visible buffer; share as `.txt`.
+  - [ ] Quick commands drawer (user-defined snippets).
 
 Acceptance criteria
-- [ ] On approval success, users see clear confirmation and useful follow‑ups.
-- [ ] Common push errors are explained with next steps.
+- [ ] Interactive TUI apps behave correctly; large outputs remain responsive.
 
 ---
 
-## 6) Settings & Diagnostics
+## 6) Disconnect & Persistence
 
-- Settings
-  - [ ] Agent URL edit with “Test Connection”.
-  - [ ] Preferences: default base branch, diff view mode, haptics, retain artifacts toggle.
-  - [ ] About: app version/build, Agent API version, links to PRD/AGENTS/troubleshooting.
+- Disconnect flow
+  - [ ] Disconnect button; confirm when foreground jobs detected.
+  - [ ] Gracefully close session; preserve terminal buffer until tab closed.
+
+- Persistence
+  - [ ] Saved Hosts model: alias, host, port, username, host key, prefs.
+  - [ ] Recent sessions list with timestamps; one-tap reconnect.
+
+Acceptance criteria
+- [ ] Users can disconnect/reconnect easily; saved hosts persist securely.
+
+---
+
+## 7) Settings & Diagnostics
+
+- Preferences
+  - [ ] Default port, theme, font size, bell, haptics, paste confirmation, scrollback size.
+  - [ ] Keep-alive interval; auto-reconnect toggle.
+
+- Security
+  - [ ] Biometric lock for opening Saved Hosts that store credentials.
+  - [ ] Manage known hosts: list and remove stored fingerprints.
 
 - Diagnostics
-  - [ ] Ping Agent (`GET /`) with result details.
-  - [ ] SSE test (`/runs/:fake/stream`) to verify connection handling without a real run.
-  - [ ] LAN helper and CORS guidance per UX.
+  - [ ] LAN helper: instructions for macOS/Windows/Linux to find IP.
+  - [ ] Ping test and port check for `host:port`.
+  - [ ] Show last error details; copy-to-clipboard.
 
 Acceptance criteria
-- [ ] Users can adjust settings and run self‑diagnostics with clear outcomes.
+- [ ] Users can adjust preferences and troubleshoot connection issues effectively.
 
 ---
 
-## 7) Testing & QA
+## 8) Testing & QA
 
-- Unit & integration (Jest + React Native Testing Library)
-  - [ ] Validate form validation and submission logic in Composer.
-  - [ ] Mock network and SSE; test reconnect/backoff and polling fallback.
-  - [ ] Diff parser tests with small/large patches; edge cases (binary files, empty diff).
-  - [ ] State management store behavior for typical and error flows.
+- Unit & integration (Jest + RNTL)
+  - [ ] Form validation and connection flows (mock transport).
+  - [ ] Terminal event pipeline: input → transport → render (mock terminal layer).
+  - [ ] Resize events, tabs management, and scrollback limits.
 
 - E2E
-  - [ ] Add Detox or Maestro flows: Connect → New Run → Stream → Diff → Approve → Success.
+  - [ ] Detox/Maestro: Welcome → Connect → Terminal → Run commands → Disconnect → Reconnect.
 
 - Coverage & CI
-  - [ ] Target ≥80% coverage for run lifecycle paths.
-  - [ ] Add `npm test` script; optional `npm run test:watch`.
+  - [ ] ≥80% coverage on connection, session, and terminal interactions.
+  - [ ] `npm test` script; optional watch mode.
 
 Acceptance criteria
-- [ ] Core screens and run lifecycle have automated tests and stable E2E flow.
+- [ ] Stable automated coverage across connect, session, and terminal usage.
 
 ---
 
-## 8) Polishing, Performance, and Docs
+## 9) Performance, Accessibility & Docs
 
 - Performance
-  - [ ] Virtualize logs and diff lists; avoid unnecessary re‑renders.
-  - [ ] Debounce expensive operations (search, filtering).
-  - [ ] Optimize bundle size; lazy‑load diff viewer.
+  - [ ] Virtualize terminal output; throttle rendering on floods.
+  - [ ] Avoid unnecessary re-renders; memoize heavy components.
 
 - Accessibility & UX
-  - [ ] Respect reduced motion; ensure contrast and tap sizes.
-  - [ ] Keyboard shortcuts in diff viewer where supported.
-  - [ ] Haptic feedback on key events (connect, approve, success/error).
+  - [ ] Large text support; VoiceOver/TalkBack labels for keys and terminal.
+  - [ ] High-contrast themes; respect reduce motion.
 
-- Developer experience
-  - [ ] Add scripts: `dev:mobile`, `lint`, `format`, `typecheck`.
-  - [ ] Prettier/ESLint configs (if not already present); keep 2‑space indent, semicolons, single quotes.
+- Developer Experience
+  - [ ] Scripts: `type-check`, `lint`, `format` (if configured).
+  - [ ] Keep 2-space indent, semicolons, single quotes.
 
 - Documentation
-  - [ ] Update `README` or `docs/` with a quickstart for local agent + mobile pairing.
-  - [ ] Add an ADR in `docs/` for “Local networking approach (HTTP over LAN, SSE choice)”.
-  - [ ] Troubleshooting guide: same‑LAN, firewalls, Android cleartext, CORS, SSE timeouts.
+  - [ ] Update `README`/`docs/` with Remote Terminal quickstart.
+  - [ ] ADR: “Terminal rendering approach (WebView + xterm.js vs native)”.
+  - [ ] Troubleshooting: IP/port, firewalls, host key mismatch, timeouts.
 
 Acceptance criteria
-- [ ] Smooth UX at 60fps for long logs/diffs; clear docs for setup and troubleshooting.
+- [ ] Smooth 60fps during typical output; clear docs for setup and troubleshooting.
 
 ---
 
 ## Cross‑Cutting Technical Tasks
 
-- API client
-  - [ ] `api/runs.ts`: `createRun`, `getRunState`, `streamRun`, `getRunDiff`, `approveRun`.
-  - [ ] Common error type with `status`, `message`, `hint`.
+- Terminal layer
+  - [ ] Embed xterm.js in `react-native-webview` with a message bridge for keystrokes and output.
+  - [ ] Map mobile keyboard events to terminal input; implement accessory keys.
 
-- SSE hook
-  - [ ] `hooks/useRunStream(runId)` returning `{ state, logs, error, reconnect }`.
-
-- Diff parsing
-  - [ ] Lightweight unified‑diff parser (or use a small dependency) producing files → hunks → lines.
-  - [ ] Compute totals (files changed, insertions, deletions).
+- Transport layer
+  - [ ] Implement chosen SSH transport (native/WASM/bridge) with APIs: `connect`, `write`, `resize`, `disconnect`.
+  - [ ] Common error model: `{ code, message, hint }`.
 
 - Storage
-  - [ ] `storage/settings.ts` for agent URL, preferences, recents.
+  - [ ] `storage/hosts.ts` for saved hosts and known hosts; `storage/prefs.ts` for preferences.
 
 - Types
-  - [ ] Shared `types/run.ts` for run statuses and payloads.
+  - [ ] `types/terminal.ts` for session state, tab model, and events.
 
 ---
 
 ## Platform/Config Checklist
 
-- [ ] Expo `app.json`: set `android.usesCleartextTraffic: true` for LAN HTTP.
-- [ ] Consider `NSLocalNetworkUsageDescription` (iOS) if system prompts appear when discovering devices.
-- [ ] Ensure agent enables CORS (see PRD agent code uses `cors()`).
+- [ ] iOS: `NSLocalNetworkUsageDescription` in `app.json` if required.
+- [ ] Android: network permissions; keyboard handling for hardware keyboards.
+- [ ] Verify `react-native-webview` settings for keyboardDisplayRequiresUserAction and mixed content if using bridge.
 
 ---
 
 ## Risks & Mitigations
 
-- SSE reliability on mobile
-  - Mitigate with robust reconnect and polling fallback; keep timeboxed backoff.
-- CORS and firewalls
-  - Provide clear diagnostics and guidance; prefer calling agent directly and enabling `cors()`.
-- Large diffs and long logs
-  - Virtualize and progressively render; cap retained lines and expose download options.
+- SSH client availability on RN
+  - Mitigate by evaluating native libs first; fallback to WebView + host-side bridge for MVP.
+- Large terminal throughput
+  - Virtualize, batch renders, and implement backpressure.
+- Security of stored secrets
+  - Use secure storage with biometric gating; never log secrets.
 
 ---
 
 ## Open Questions
 
-- Do we allow editing the commit message, or keep it fixed (`codex: change`) for MVP?
-- Should we support canceling a run from mobile, and will the agent expose `/runs/:id/cancel`?
-- Do we need a thin “backend stub” or strictly direct‑to‑agent calls for MVP?
+- Which SSH transport path do we choose for MVP (A/B/C)?
+- Do we support key-based auth in MVP or add in Phase 2?
+- Do we support multiple concurrent tabs per host initially?
 
 ---
 
 ## Acceptance: End‑to‑End Demo Script
 
-- [ ] Start agent on laptop: `node agent.js`, confirm `http://<LAN-IP>:8080` reachable.
-- [ ] On mobile: Connect screen → set URL and connect.
-- [ ] New Run: enter repo URL, base branch, and prompt → Start Run.
-- [ ] Run Detail: see live logs and status progress to `NEEDS_APPROVAL`.
-- [ ] Diff & Approve: view patch, approve & push.
-- [ ] Apply & Success: see success summary; open GitHub link; start another run.
-
+- [ ] Launch app → Welcome → "Connect to Computer".
+- [ ] Enter host/IP, port 22, username, password → Connect.
+- [ ] Terminal appears; run `uname -a`, `top`, open `vim`, etc.
+- [ ] Open new tab; run commands; switch tabs.
+- [ ] Disconnect and reconnect from Saved Hosts.
