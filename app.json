@@ -1,11 +1,11 @@
 {
   "expo": {
-    "name": "mobile",
-    "slug": "mobile",
+    "name": "jasmine",
+    "slug": "jasmine",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
-    "scheme": "mobile",
+    "scheme": "jasmine",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
     "splash": {

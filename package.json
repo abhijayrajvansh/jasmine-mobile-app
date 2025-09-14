@@ -4,10 +4,19 @@
   "version": "1.0.0",
   "scripts": {
     "start": "expo start",
-    "android": "expo start --android",
+    "dev": "expo start --dev-client --host lan",
     "ios": "expo start --ios",
+    "android": "expo start --android",
+    "native:ios-dev": "expo run:ios",
+    "native:ios-preview": "expo run:ios --device --configuration Release",
+    "native:android": "expo run:android",
     "web": "expo start --web",
-    "type-check": "tsc --noEmit"
+    "prebuild": "expo prebuild && xed ios && npm run dev",
+    "type-check": "tsc --noEmit",
+    "doctor": "npx expo-doctor",
+    "lint": "expo lint",
+    "generate-apk-file": "eas build --platform android --local --profile preview",
+    "generate-ipa-file": "echo prebuild first then open ios xcworkspace and change the run scheme to release and build for local iphone then check Xcode-DerivedData-AppName-Build-Products-ReleaseIphoneOS** folder for released app file then convert wrap that into zip -r appname.ipa Payload file."
   },
   "dependencies": {
     "@expo/vector-icons": "^15.0.2",
