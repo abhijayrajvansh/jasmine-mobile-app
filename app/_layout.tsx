@@ -56,6 +56,8 @@ function RootLayoutNav() {
           <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
           <Stack.Screen name="modal" options={{ presentation: 'modal' }} />
           <Stack.Screen name="connect" options={{ title: 'Connect' }} />
+          <Stack.Screen name="terminal" options={{ title: 'SSH Terminal' }} />
+          <Stack.Screen name="terminal/session" options={{ title: 'Session' }} />
           <Stack.Screen name="run/new" options={{ title: 'New Run' }} />
           <Stack.Screen name="run/[id]" options={{ title: 'Run' }} />
           <Stack.Screen name="run/[id]/diff" options={{ title: 'Diff' }} />
