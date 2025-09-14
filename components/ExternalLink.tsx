@@ -10,7 +10,8 @@ export function ExternalLink(
     <Link
       target="_blank"
       {...props}
-      href={props.href}
+      // Cast to relax Expo Router's typed href for external URLs
+      href={props.href as any}
       onPress={(e) => {
         if (Platform.OS !== 'web') {
           // Prevent the default behavior of linking to the default browser on native.

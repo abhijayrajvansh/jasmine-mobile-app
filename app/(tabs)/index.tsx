@@ -1,4 +1,5 @@
 import { StyleSheet } from 'react-native';
+import { Link } from 'expo-router';
 
 import EditScreenInfo from '@/components/EditScreenInfo';
 import { Text, View } from '@/components/Themed';
@@ -9,6 +10,9 @@ export default function TabOneScreen() {
       <Text style={styles.title}>Tab One</Text>
       <View style={styles.separator} lightColor="#eee" darkColor="rgba(255,255,255,0.1)" />
       <EditScreenInfo path="app/(tabs)/index.tsx" />
+      <Link href="/connect" style={styles.cta}>
+        Connect to Agent
+      </Link>
     </View>
   );
 }
@@ -27,5 +31,10 @@ const styles = StyleSheet.create({
     marginVertical: 30,
     height: 1,
     width: '80%',
+  },
+  cta: {
+    marginTop: 16,
+    color: '#2f95dc',
+    fontWeight: '600',
   },
 });
