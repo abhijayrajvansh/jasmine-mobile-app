@@ -13,33 +13,47 @@ function buildHtml() {
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/xterm/css/xterm.css" />
   <style>
-    html, body { height:100%; margin:0; background:#000; }
+    html, body { height:100%; margin:0; background:#000; color:#fff; font-family: Menlo, monospace; }
     #terminal { height:100%; }
+    #fallback { padding: 8px; white-space: pre-wrap; font-size: 13px; }
   </style>
   <title>Terminal</title>
+  <script>
+    function rnpost(obj){ try { (window.ReactNativeWebView||window).postMessage(JSON.stringify(obj)); } catch(e){} }
+    window.onerror = function(message, source, lineno, colno){ rnpost({ type: 'error', message, source, lineno, colno }); };
+  </script>
   <script src="https://cdn.jsdelivr.net/npm/xterm/lib/xterm.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/xterm-addon-fit/lib/xterm-addon-fit.min.js"></script>
   <script>
-    const term = new window.Terminal({ cursorBlink: true, fontFamily: 'Menlo, monospace', theme: { background: '#000000', foreground: '#ffffff' } });
-    const fit = new (window).FitAddon.FitAddon();
-    term.loadAddon(fit);
-    function println(s){ term.writeln(s); }
+    function createTerm(){
+      try {
+        if (!window.Terminal || !window.FitAddon) throw new Error('xterm not loaded');
+        const term = new window.Terminal({ cursorBlink: true, fontFamily: 'Menlo, monospace', theme: { background: '#000000', foreground: '#ffffff' } });
+        const fit = new (window).FitAddon.FitAddon();
+        term.loadAddon(fit);
+        return { term, fit };
+      } catch (e) { return null; }
+    }
     function init() {
       const el = document.getElementById('terminal');
-      term.open(el);
-      try { fit.fit(); } catch(e) {}
-      term.focus();
+      const fb = document.getElementById('fallback');
+      const c = createTerm();
+      let term, fit;
+      if (c) { term = c.term; fit = c.fit; term.open(el); try{fit.fit();}catch(e){} term.focus(); }
+      else { el.style.display='none'; fb.style.display='block'; fb.textContent='Loading terminal...'; }
+      function println(s){ if (term) term.writeln(s); else fb.textContent += "\n" + s; }
       println('Direct SSH mode');
-      term.onData(d => window.ReactNativeWebView && window.ReactNativeWebView.postMessage(JSON.stringify({ type: 'stdin', data: d })));
+      if (term) term.onData(d => window.ReactNativeWebView && window.ReactNativeWebView.postMessage(JSON.stringify({ type: 'stdin', data: d })));
+      window.writeData = function(data){ if (term) term.write(data); else fb.textContent += String(data); };
+      window.notify = function(msg){ println(msg); };
+      window.addEventListener('resize', () => { try { if (fit) fit.fit(); } catch(e){} });
     }
-    function writeData(data){ term.write(data); }
-    function notify(msg){ println(msg); }
-    window.addEventListener('resize', () => { try { fit.fit(); } catch(e){} });
     window.onload = init;
   </script>
   </head>
   <body>
     <div id="terminal"></div>
+    <div id="fallback" style="display:none"></div>
   </body>
   </html>`;
 }
