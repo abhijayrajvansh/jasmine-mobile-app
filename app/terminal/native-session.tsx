@@ -18,17 +18,23 @@ function buildHtml() {
   </style>
   <title>Terminal</title>
   <script src="https://cdn.jsdelivr.net/npm/xterm/lib/xterm.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/xterm-addon-fit/lib/xterm-addon-fit.min.js"></script>
   <script>
-    const term = new window.Terminal({ cursorBlink: true, fontFamily: 'Menlo, monospace', theme: { background: '#000000' } });
+    const term = new window.Terminal({ cursorBlink: true, fontFamily: 'Menlo, monospace', theme: { background: '#000000', foreground: '#ffffff' } });
+    const fit = new (window).FitAddon.FitAddon();
+    term.loadAddon(fit);
     function println(s){ term.writeln(s); }
     function init() {
       const el = document.getElementById('terminal');
       term.open(el);
+      try { fit.fit(); } catch(e) {}
+      term.focus();
       println('Direct SSH mode');
       term.onData(d => window.ReactNativeWebView && window.ReactNativeWebView.postMessage(JSON.stringify({ type: 'stdin', data: d })));
     }
     function writeData(data){ term.write(data); }
     function notify(msg){ println(msg); }
+    window.addEventListener('resize', () => { try { fit.fit(); } catch(e){} });
     window.onload = init;
   </script>
   </head>

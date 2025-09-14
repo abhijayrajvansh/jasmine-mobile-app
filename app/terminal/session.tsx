@@ -17,21 +17,32 @@ function buildHtml() {
   </style>
   <title>Terminal</title>
   <script src="https://cdn.jsdelivr.net/npm/xterm/lib/xterm.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/xterm-addon-fit/lib/xterm-addon-fit.min.js"></script>
   <script>
-    const term = new window.Terminal({ cursorBlink: true, fontFamily: 'Menlo, monospace', theme: { background: '#000000' } });
+    const term = new window.Terminal({ cursorBlink: true, fontFamily: 'Menlo, monospace', theme: { background: '#000000', foreground: '#ffffff' } });
+    const fit = new (window).FitAddon.FitAddon();
+    term.loadAddon(fit);
     function println(s){ term.writeln(s); }
     function init() {
       const el = document.getElementById('terminal');
       term.open(el);
+      try { fit.fit(); } catch(e) {}
+      term.focus();
       println('Connecting...');
-      window.addEventListener('message', (e) => {
+      const handler = (e) => {
         try {
           const cfg = JSON.parse(e.data);
           startWs(cfg);
         } catch (err) {
           println('Invalid config');
         }
-      }, { once: true });
+      };
+      // React Native WebView messaging differs per platform; listen to both.
+      window.addEventListener('message', handler, { once: true });
+      document.addEventListener('message', handler, { once: true });
+      // Also expose a direct starter the RN side can call via injectJavaScript
+      window.startWithConfig = (cfg) => { try { startWs(cfg); } catch (e) { println('Start error'); } };
+      window.addEventListener('resize', () => { try { fit.fit(); notifyResize(); } catch(e){} });
     }
     let ws;
     function startWs(cfg){
@@ -39,6 +50,8 @@ function buildHtml() {
       ws.onopen = () => {
         ws.send(JSON.stringify({ type: 'connect', host: cfg.host, port: Number(cfg.port)||22, username: cfg.username, password: cfg.password }));
         term.onData(d => ws && ws.send(JSON.stringify({ type: 'stdin', data: d })));
+        // send initial size for PTY allocation if supported
+        notifyResize();
       };
       ws.onmessage = (ev) => {
         try {
@@ -54,6 +67,13 @@ function buildHtml() {
       };
       ws.onclose = () => println('\r\n[disconnected]');
       ws.onerror = () => println('\r\n[ws error]');
+    }
+    function notifyResize(){
+      if (!ws) return;
+      try {
+        const cols = term.cols; const rows = term.rows;
+        ws.send(JSON.stringify({ type: 'resize', cols, rows }));
+      } catch {}
     }
     window.onload = init;
   </script>
@@ -83,7 +103,7 @@ export default function TerminalSessionScreen() {
         ref={ref}
         originWhitelist={["*"]}
         source={{ html }}
-        onLoad={() => ref.current?.postMessage(JSON.stringify(cfg))}
+        onLoad={() => ref.current?.injectJavaScript(`window.startWithConfig(${JSON.stringify(cfg)}); true;`)}
         allowsBackForwardNavigationGestures
         allowFileAccess
         allowUniversalAccessFromFileURLs
@@ -99,4 +119,3 @@ const styles = StyleSheet.create({
   container: { flex: 1 },
   web: { flex: 1, backgroundColor: '#000' },
 });
-
