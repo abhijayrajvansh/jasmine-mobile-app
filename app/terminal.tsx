@@ -1,9 +1,12 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { KeyboardAvoidingView, Platform, StyleSheet, TouchableOpacity, View as RNView, Switch } from 'react-native';
+import { KeyboardAvoidingView, Platform, StyleSheet, TouchableOpacity, View as RNView, Switch, Alert } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Text, View, TextInput } from '@/components/Themed';
 import { isNativeSshAvailable } from '@/lib/nativeSsh';
 import { useLocalSearchParams } from 'expo-router';
+import { useHosts } from '@/context/HostsContext';
+import { setSavedPassword } from '@/storage/hosts';
+import { testBridge } from '@/lib/bridge';
 
 export default function TerminalConnectScreen() {
   const router = useRouter();
@@ -14,6 +17,11 @@ export default function TerminalConnectScreen() {
   const [password, setPassword] = useState('');
   const [useDirect, setUseDirect] = useState(isNativeSshAvailable());
   const [bridgeUrl, setBridgeUrl] = useState('ws://localhost:8080/ws/ssh');
+  const [alias, setAlias] = useState('');
+  const [saveHost, setSaveHost] = useState(true);
+  const [savePwd, setSavePwd] = useState(false);
+  const [testingBridge, setTestingBridge] = useState(false);
+  const { add: addHost } = useHosts();
 
   const valid = useMemo(() => host.trim().length > 0 && username.trim().length > 0 && password.length > 0 && /^\d+$/.test(port), [host, port, username, password]);
 
@@ -23,7 +31,7 @@ export default function TerminalConnectScreen() {
     if (params?.username) setUsername(String(params.username));
   }, [params.host, params.port, params.username]);
 
-  function onConnect() {
+  async function onConnect() {
     if (!valid) return;
     const base = {
       host: host.trim(),
@@ -31,10 +39,40 @@ export default function TerminalConnectScreen() {
       username: username.trim(),
       password,
     };
+    if (!useDirect) {
+      // Soft preflight: ensure WS URL shape is correct
+      if (!/^wss?:\/\//.test(bridgeUrl.trim())) {
+        Alert.alert('Invalid Bridge URL', 'Use ws://<IP>:<port>/ws/ssh');
+        return;
+      }
+    }
+    if (saveHost) {
+      const saved = await addHost({ alias: alias.trim() || undefined, host: base.host, port: Number(base.port) || 22, username: base.username });
+      if (savePwd) await setSavedPassword(saved.id, password);
+    }
     if (useDirect) {
       router.push({ pathname: '/terminal/native-session', params: base } as any);
     } else {
       router.push({ pathname: '/terminal/session', params: { ...base, bridgeUrl: bridgeUrl.trim() } } as any);
+    }
+  }
+
+  async function onTestBridge() {
+    const url = bridgeUrl.trim();
+    if (!/^wss?:\/\//.test(url)) {
+      Alert.alert('Invalid URL', 'Bridge WebSocket URL must start with ws:// or wss://');
+      return;
+    }
+    setTestingBridge(true);
+    try {
+      const res = await testBridge(url, 4000);
+      if (res.httpOk && res.wsOk) Alert.alert('Bridge OK', 'HTTP and WebSocket checks passed.');
+      else if (!res.httpOk) Alert.alert('Bridge HTTP failed', res.message || 'Cannot reach bridge HTTP endpoint.');
+      else Alert.alert('Bridge WS failed', res.message || 'WebSocket failed to open.');
+    } catch (e: any) {
+      Alert.alert('Bridge test error', e?.message || 'Unknown error');
+    } finally {
+      setTestingBridge(false);
     }
   }
 
@@ -61,8 +99,23 @@ export default function TerminalConnectScreen() {
         <>
           <Text style={styles.help}>Bridge WebSocket URL (agent):</Text>
           <TextInput placeholder="ws://localhost:8080/ws/ssh" value={bridgeUrl} onChangeText={setBridgeUrl} autoCapitalize="none" autoCorrect={false} style={styles.input} />
+          <TouchableOpacity onPress={onTestBridge} style={[styles.buttonSecondary, testingBridge && styles.buttonDisabled]}>
+            <Text style={styles.buttonSecondaryText}>{testingBridge ? 'Testing…' : 'Test Bridge'}</Text>
+          </TouchableOpacity>
         </>
       )}
+
+      <Text style={styles.label}>Alias (optional)</Text>
+      <TextInput placeholder="My Laptop" value={alias} onChangeText={setAlias} style={styles.input} />
+
+      <RNView style={styles.row}>
+        <Text style={{ fontWeight: '500', flex: 1 }}>Save to Saved Hosts</Text>
+        <Switch value={saveHost} onValueChange={setSaveHost} />
+      </RNView>
+      <RNView style={styles.row}>
+        <Text style={{ fontWeight: '500', flex: 1 }}>Save password (secure)</Text>
+        <Switch value={savePwd} onValueChange={setSavePwd} />
+      </RNView>
 
       <TouchableOpacity disabled={!valid} onPress={onConnect} style={[styles.button, !valid && styles.buttonDisabled]}>
         <Text style={styles.buttonText}>Connect</Text>
@@ -81,4 +134,6 @@ const styles = StyleSheet.create({
   button: { backgroundColor: '#2f95dc', paddingVertical: 12, borderRadius: 8, alignItems: 'center', marginTop: 12 },
   buttonDisabled: { opacity: 0.5 },
   buttonText: { color: '#fff', fontWeight: '600' },
+  buttonSecondary: { backgroundColor: '#1f2937', paddingVertical: 10, borderRadius: 8, alignItems: 'center', marginTop: 8 },
+  buttonSecondaryText: { color: '#fff' },
 });
