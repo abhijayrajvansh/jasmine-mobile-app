@@ -8,6 +8,7 @@ import 'react-native-reanimated';
 
 import { useColorScheme } from '@/components/useColorScheme';
 import { SettingsProvider } from '@/context/SettingsContext';
+import { HostsProvider } from '@/context/HostsContext';
 
 export {
   // Catch any errors thrown by the Layout component.
@@ -16,7 +17,7 @@ export {
 
 export const unstable_settings = {
   // Ensure that reloading on `/modal` keeps a back button present.
-  initialRouteName: '(tabs)',
+  initialRouteName: 'index',
 };
 
 // Prevent the splash screen from auto-hiding before asset loading is complete.
@@ -51,20 +52,23 @@ function RootLayoutNav() {
 
   return (
     <SettingsProvider>
-      <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
-        <Stack>
-          <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-          <Stack.Screen name="modal" options={{ presentation: 'modal' }} />
-          <Stack.Screen name="connect" options={{ title: 'Connect' }} />
-          <Stack.Screen name="terminal" options={{ title: 'SSH Terminal' }} />
-          <Stack.Screen name="terminal/session" options={{ title: 'Session' }} />
-          <Stack.Screen name="terminal/native-session" options={{ title: 'Direct SSH' }} />
-          <Stack.Screen name="run/new" options={{ title: 'New Run' }} />
-          <Stack.Screen name="run/[id]" options={{ title: 'Run' }} />
-          <Stack.Screen name="run/[id]/diff" options={{ title: 'Diff' }} />
-          <Stack.Screen name="settings" options={{ title: 'Settings' }} />
-        </Stack>
-      </ThemeProvider>
+      <HostsProvider>
+        <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
+          <Stack>
+            <Stack.Screen name="index" options={{ title: 'Remote Terminal' }} />
+            <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+            <Stack.Screen name="modal" options={{ presentation: 'modal' }} />
+            <Stack.Screen name="connect" options={{ title: 'Connect' }} />
+            <Stack.Screen name="terminal" options={{ title: 'SSH Terminal' }} />
+            <Stack.Screen name="terminal/session" options={{ title: 'Session' }} />
+            <Stack.Screen name="terminal/native-session" options={{ title: 'Direct SSH' }} />
+            <Stack.Screen name="run/new" options={{ title: 'New Run' }} />
+            <Stack.Screen name="run/[id]" options={{ title: 'Run' }} />
+            <Stack.Screen name="run/[id]/diff" options={{ title: 'Diff' }} />
+            <Stack.Screen name="settings" options={{ title: 'Settings' }} />
+          </Stack>
+        </ThemeProvider>
+      </HostsProvider>
     </SettingsProvider>
   );
 }

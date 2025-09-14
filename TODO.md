@@ -25,21 +25,21 @@ Each milestone has clear acceptance criteria.
 ## 1) Foundation & Welcome
 
 - Project setup
-  - [ ] Confirm Expo SDK and React Native versions (managed workflow).
-  - [ ] Base navigation with `expo-router` (root stack in `_layout.tsx`).
-  - [ ] Route stubs: `app/index.tsx` (Welcome), `app/connect.tsx`, `app/terminal/index.tsx`, `app/settings.tsx`.
-  - [ ] Global light/dark theme with system detection.
+  - [x] Confirm Expo SDK and React Native versions (managed workflow).
+  - [x] Base navigation with `expo-router` (root stack in `_layout.tsx`).
+  - [x] Route stubs: `app/index.tsx` (Welcome), `app/connect.tsx`, `app/terminal` (connect), `app/settings.tsx`.
+  - [x] Global light/dark theme with system detection.
 
 - Storage & context
-  - [ ] App context for session and saved hosts list.
-  - [ ] Secure storage for secrets using `expo-secure-store`; fall back to `AsyncStorage` for non-secrets.
+  - [x] App context for session and saved hosts list.
+  - [x] Secure storage for secrets using `expo-secure-store`; fall back to `AsyncStorage` for non-secrets.
 
 - Welcome screen (UX Stage 1)
-  - [ ] CTA: "Connect to Computer"; list "Saved Hosts" with quick connect and delete.
-  - [ ] Help link: "How to find my IP" modal.
+  - [x] CTA: "Connect to Computer"; list "Saved Hosts" with quick connect and delete.
+  - [x] Help link: "How to find my IP" modal.
 
 Acceptance criteria
-- [ ] App launches to Welcome; Saved Hosts visible when present; navigation works.
+- [x] App launches to Welcome; Saved Hosts visible when present; navigation works.
 
 ---
 

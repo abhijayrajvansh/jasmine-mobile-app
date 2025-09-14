@@ -1,18 +1,26 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { KeyboardAvoidingView, Platform, StyleSheet, TouchableOpacity, View as RNView, Switch } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Text, View, TextInput } from '@/components/Themed';
+import { useLocalSearchParams } from 'expo-router';
 
 export default function TerminalConnectScreen() {
   const router = useRouter();
-  const [host, setHost] = useState('');
-  const [port, setPort] = useState('22');
-  const [username, setUsername] = useState('');
+  const params = useLocalSearchParams<{ host?: string; port?: string; username?: string }>();
+  const [host, setHost] = useState(params.host ?? '');
+  const [port, setPort] = useState(params.port ?? '22');
+  const [username, setUsername] = useState(params.username ?? '');
   const [password, setPassword] = useState('');
   const [useDirect, setUseDirect] = useState(true);
   const [bridgeUrl, setBridgeUrl] = useState('ws://localhost:8080/ws/ssh');
 
   const valid = useMemo(() => host.trim().length > 0 && username.trim().length > 0 && password.length > 0 && /^\d+$/.test(port), [host, port, username, password]);
+
+  useEffect(() => {
+    if (params?.host) setHost(String(params.host));
+    if (params?.port) setPort(String(params.port));
+    if (params?.username) setUsername(String(params.username));
+  }, [params.host, params.port, params.username]);
 
   function onConnect() {
     if (!valid) return;
