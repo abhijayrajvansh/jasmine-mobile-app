@@ -12,19 +12,16 @@ function buildHtml() {
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <style>
     html, body { height:100%; margin:0; background:#000; color:#fff; font-family: Menlo, monospace; }
-    #out { position:absolute; top:0; left:0; right:0; bottom:48px; padding:8px; overflow:auto; white-space:pre-wrap; }
-    #bar { position:absolute; left:0; right:0; bottom:0; height:48px; display:flex; align-items:center; gap:8px; padding:8px; background:#111; border-top:1px solid #222; }
-    #in { flex:1; background:#000; color:#fff; border:1px solid #333; border-radius:6px; padding:8px; font-family: Menlo, monospace; }
-    #hint { font-size:12px; opacity:0.7; }
+    #out { position:absolute; top:0; left:0; right:0; bottom:0; padding:8px; overflow:auto; white-space:pre-wrap; outline:none; }
+    #overlay { position:absolute; bottom:8px; left:0; right:0; text-align:center; opacity:0.6; font-size:12px; }
   </style>
   <title>Terminal</title>
   <script>
     function rnpost(obj){ try { (window.ReactNativeWebView||window).postMessage(JSON.stringify(obj)); } catch(e){} }
     window.onerror = function(message, source, lineno, colno){ rnpost({ type: 'error', message, source, lineno, colno }); };
-    let ws; let outEl; let inEl;
+    let ws; let outEl; let overlay;
     function write(s){ try { outEl.textContent += s; outEl.scrollTop = outEl.scrollHeight; } catch(e){} }
-    function send(data){ try { ws && ws.readyState===1 && ws.send(JSON.stringify({ type:'stdin', data })); } catch(e){}
-    }
+    function send(data){ try { ws && ws.readyState===1 && ws.send(JSON.stringify({ type:'stdin', data })); } catch(e){} }
     function keyToSeq(ev){
       if (ev.key === 'Enter') return '\n';
       if (ev.key === 'Backspace') return '\b';
@@ -53,12 +50,14 @@ function buildHtml() {
     }
     function init(){
       outEl = document.getElementById('out');
-      inEl = document.getElementById('in');
-      inEl.addEventListener('keydown', (ev) => {
+      overlay = document.getElementById('overlay');
+      outEl.setAttribute('contenteditable', 'true');
+      outEl.addEventListener('keydown', (ev) => {
         const seq = keyToSeq(ev);
         if (seq) { ev.preventDefault(); send(seq); }
       });
-      document.body.addEventListener('click', () => inEl.focus());
+      outEl.addEventListener('beforeinput', (ev) => { ev.preventDefault(); });
+      document.body.addEventListener('click', () => { outEl.focus(); if (overlay) overlay.style.display='none'; });
       const handler = (e) => { try { const cfg = JSON.parse(e.data); startWs(cfg); } catch(err){ write('\n[config error]'); rnpost({type:'error', message:String(err)});} };
       window.addEventListener('message', handler, { once:true });
       document.addEventListener('message', handler, { once:true });
@@ -70,10 +69,7 @@ function buildHtml() {
 </head>
 <body>
   <div id="out"></div>
-  <div id="bar">
-    <input id="in" placeholder="Type here…" />
-    <div id="hint">Enter sends, ⌫ backspace, Ctrl+C</div>
-  </div>
+  <div id="overlay">Tap anywhere to focus (Enter, ⌫, Ctrl+C supported).</div>
 </body>
 </html>`;
 }
