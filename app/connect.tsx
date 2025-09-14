@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { Alert, KeyboardAvoidingView, Platform, StyleSheet, TextInput, TouchableOpacity, View } from 'react-native';
+import { Alert, KeyboardAvoidingView, Platform, StyleSheet, TouchableOpacity, View } from 'react-native';
 import { useRouter } from 'expo-router';
-import { Text } from '@/components/Themed';
+import { Text, TextInput } from '@/components/Themed';
 import { useSettings } from '@/context/SettingsContext';
 import { normalizeBaseUrl } from '@/constants/config';
 
@@ -80,4 +80,3 @@ const styles = StyleSheet.create({
   chip: { paddingHorizontal: 10, paddingVertical: 6, backgroundColor: '#eee', borderRadius: 999 },
   chipText: { fontSize: 12 },
 });
-

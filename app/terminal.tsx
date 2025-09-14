@@ -1,7 +1,7 @@
 import React, { useMemo, useState } from 'react';
-import { KeyboardAvoidingView, Platform, StyleSheet, TextInput, TouchableOpacity, View as RNView, Switch } from 'react-native';
+import { KeyboardAvoidingView, Platform, StyleSheet, TouchableOpacity, View as RNView, Switch } from 'react-native';
 import { useRouter } from 'expo-router';
-import { Text, View } from '@/components/Themed';
+import { Text, View, TextInput } from '@/components/Themed';
 
 export default function TerminalConnectScreen() {
   const router = useRouter();
