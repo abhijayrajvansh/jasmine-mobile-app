@@ -2,8 +2,8 @@ import React, { useEffect, useMemo, useRef } from 'react';
 import { Alert, Platform, StyleSheet } from 'react-native';
 import { WebView } from 'react-native-webview';
 import { useLocalSearchParams } from 'expo-router';
-import { View } from '@/components/Themed';
-import { createSshSession } from '@/lib/nativeSsh';
+import { Text, View } from '@/components/Themed';
+import { createSshSession, isNativeSshAvailable } from '@/lib/nativeSsh';
 
 function buildHtml() {
   return `<!DOCTYPE html>
@@ -56,6 +56,14 @@ export default function NativeSshSessionScreen() {
 
   const sessionRef = useRef<ReturnType<typeof createSshSession> | null>(null);
   useEffect(() => {
+    if (!isNativeSshAvailable()) {
+      if (Platform.OS === 'web') {
+        Alert.alert('Direct SSH unavailable', 'Web preview cannot run Direct SSH. Use the WebSocket bridge mode or build a native dev client.');
+      } else {
+        Alert.alert('Direct SSH unavailable', 'Native SSH module not found. Build a dev client with the native module or use the WebSocket bridge mode.');
+      }
+      return;
+    }
     const p = Number(port ?? '22') || 22;
     const session = createSshSession({ host, port: p, username, password });
     sessionRef.current = session;
@@ -86,6 +94,15 @@ export default function NativeSshSessionScreen() {
 
   return (
     <View style={styles.container}>
+      {!isNativeSshAvailable() ? (
+        <View style={styles.unavailableBox}>
+          <Text style={styles.unavailableTitle}>Direct SSH not available</Text>
+          <Text style={styles.unavailableHelp}>
+            Use the WebSocket bridge mode (turn off "Use Direct SSH"), or build a native dev client that includes the SSH
+            module.
+          </Text>
+        </View>
+      ) : null}
       <WebView
         ref={ref}
         originWhitelist={["*"]}
@@ -114,4 +131,7 @@ export default function NativeSshSessionScreen() {
 const styles = StyleSheet.create({
   container: { flex: 1 },
   web: { flex: 1, backgroundColor: '#000' },
+  unavailableBox: { position: 'absolute', zIndex: 2, top: 0, left: 0, right: 0, padding: 16, backgroundColor: 'rgba(0,0,0,0.8)' },
+  unavailableTitle: { fontSize: 16, fontWeight: '600' },
+  unavailableHelp: { marginTop: 6, opacity: 0.8 },
 });

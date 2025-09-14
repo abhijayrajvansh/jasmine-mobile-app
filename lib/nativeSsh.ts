@@ -24,11 +24,20 @@ type NativeSshModuleType = {
 
 const NativeSshModule: NativeSshModuleType | undefined = (NativeModules as any).RNNativeSsh;
 
+export function isNativeSshAvailable(): boolean {
+  try {
+    return !!NativeSshModule && !!NativeSshModule.isAvailable() && Platform.OS !== 'web';
+  } catch {
+    return false;
+  }
+}
+
 export function createSshSession(options: SshConnectOptions): SshSession {
-  if (!NativeSshModule || !NativeSshModule.isAvailable() || Platform.OS === 'web') {
+  if (!isNativeSshAvailable()) {
     return createUnavailableSession(options);
   }
-  const sessionId = NativeSshModule.connect(options);
+  const mod = NativeSshModule as NativeSshModuleType;
+  const sessionId = mod.connect(options);
   const emitter = new NativeEventEmitter(NativeModules.RNNativeSsh);
 
   const dataSubs = new Set<(chunk: string) => void>();
@@ -46,9 +55,9 @@ export function createSshSession(options: SshConnectOptions): SshSession {
   });
 
   return {
-    write: (d: string) => NativeSshModule.write(sessionId, d),
+    write: (d: string) => mod.write(sessionId, d),
     close: () => {
-      NativeSshModule.close(sessionId);
+      mod.close(sessionId);
       dataSub.remove();
       exitSub.remove();
       errorSub.remove();
@@ -83,4 +92,3 @@ function createUnavailableSession(_options: SshConnectOptions): SshSession {
     onError: () => unsub,
   };
 }
-
