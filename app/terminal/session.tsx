@@ -10,91 +10,70 @@ function buildHtml() {
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/xterm/css/xterm.css" />
   <style>
     html, body { height:100%; margin:0; background:#000; color:#fff; font-family: Menlo, monospace; }
-    #terminal { height:100%; }
-    #fallback { padding: 8px; white-space: pre-wrap; font-size: 13px; }
+    #out { position:absolute; top:0; left:0; right:0; bottom:48px; padding:8px; overflow:auto; white-space:pre-wrap; }
+    #bar { position:absolute; left:0; right:0; bottom:0; height:48px; display:flex; align-items:center; gap:8px; padding:8px; background:#111; border-top:1px solid #222; }
+    #in { flex:1; background:#000; color:#fff; border:1px solid #333; border-radius:6px; padding:8px; font-family: Menlo, monospace; }
+    #hint { font-size:12px; opacity:0.7; }
   </style>
   <title>Terminal</title>
   <script>
     function rnpost(obj){ try { (window.ReactNativeWebView||window).postMessage(JSON.stringify(obj)); } catch(e){} }
     window.onerror = function(message, source, lineno, colno){ rnpost({ type: 'error', message, source, lineno, colno }); };
-  </script>
-  <script src="https://cdn.jsdelivr.net/npm/xterm/lib/xterm.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/xterm-addon-fit/lib/xterm-addon-fit.min.js"></script>
-  <script>
-    function createTerm(){
-      try {
-        if (!window.Terminal || !window.FitAddon) throw new Error('xterm not loaded');
-        const term = new window.Terminal({ cursorBlink: true, fontFamily: 'Menlo, monospace', theme: { background: '#000000', foreground: '#ffffff' } });
-        const fit = new (window).FitAddon.FitAddon();
-        term.loadAddon(fit);
-        return { term, fit };
-      } catch (e) { return null; }
+    let ws; let outEl; let inEl;
+    function write(s){ try { outEl.textContent += s; outEl.scrollTop = outEl.scrollHeight; } catch(e){} }
+    function send(data){ try { ws && ws.readyState===1 && ws.send(JSON.stringify({ type:'stdin', data })); } catch(e){}
     }
-    function init() {
-      const el = document.getElementById('terminal');
-      const fb = document.getElementById('fallback');
-      const c = createTerm();
-      let term, fit;
-      if (c) {
-        term = c.term; fit = c.fit;
-        term.open(el);
-        try { fit.fit(); } catch(e) {}
-        term.focus();
-      } else {
-        el.style.display = 'none';
-        fb.style.display = 'block';
-        fb.textContent = 'Loading terminal...';
-      }
-      function println(s){ if (term) term.writeln(s); else fb.textContent += "\n" + s; }
-      println('Connecting...');
-      const handler = (e) => {
-        try { const cfg = JSON.parse(e.data); startWs(cfg, term, println); }
-        catch (err) { println('Invalid config'); rnpost({ type:'error', message: String(err)}); }
-      };
-      window.addEventListener('message', handler, { once: true });
-      document.addEventListener('message', handler, { once: true });
-      window.startWithConfig = (cfg) => { try { startWs(cfg, term, println); } catch (e) { println('Start error'); rnpost({ type:'error', message:String(e)}); } };
-      window.addEventListener('resize', () => { try { if (term) notifyResize(term); } catch(e){} });
+    function keyToSeq(ev){
+      if (ev.key === 'Enter') return '\n';
+      if (ev.key === 'Backspace') return '\b';
+      if (ev.key === 'Tab') return '\t';
+      if (ev.ctrlKey && ev.key.toLowerCase() === 'c') return '\u0003';
+      if (ev.ctrlKey && ev.key.toLowerCase() === 'd') return '\u0004';
+      if (ev.key && ev.key.length === 1) return ev.key;
+      return '';
     }
-    let ws;
-    function startWs(cfg, term, println){
-      try { ws = new WebSocket(cfg.bridgeUrl); } catch(e) { println('WebSocket error: ' + e); rnpost({ type:'error', message: String(e)}); return; }
+    function startWs(cfg){
+      try { ws = new WebSocket(cfg.bridgeUrl); } catch(e){ write('\n[ws error] ' + e); rnpost({type:'error', message:String(e)}); return; }
       ws.onopen = () => {
-        ws.send(JSON.stringify({ type: 'connect', host: cfg.host, port: Number(cfg.port)||22, username: cfg.username, password: cfg.password }));
-        if (term) term.onData(d => ws && ws.send(JSON.stringify({ type: 'stdin', data: d })));
-        notifyResize(term);
+        ws.send(JSON.stringify({ type:'connect', host: cfg.host, port: Number(cfg.port)||22, username: cfg.username, password: cfg.password }));
+        write('Connecting...\n');
       };
       ws.onmessage = (ev) => {
         try {
           const msg = JSON.parse(ev.data);
-          if (msg.type === 'data') {
-            if (term) term.write(msg.data); else println(msg.data);
-          } else if (msg.type === 'exit') {
-            println('\r\n[session closed]');
-          } else if (msg.type === 'error') {
-            println('\r\n[error] ' + (msg.message || ''));
-          }
-        } catch { if (term) term.write(ev.data); else println(String(ev.data)); }
+          if (msg.type === 'data') write(msg.data);
+          else if (msg.type === 'exit') write('\n[session closed]');
+          else if (msg.type === 'error') write('\n[error] ' + (msg.message||''));
+        } catch { write(String(ev.data)); }
       };
-      ws.onclose = () => println('\r\n[disconnected]');
-      ws.onerror = () => { println('\r\n[ws error]'); rnpost({ type:'error', message:'ws error'}); };
+      ws.onclose = () => write('\n[disconnected]');
+      ws.onerror = () => write('\n[ws error]');
     }
-    function notifyResize(term){
-      if (!ws || !term) return;
-      try {
-        const cols = term.cols; const rows = term.rows;
-        ws.send(JSON.stringify({ type: 'resize', cols, rows }));
-      } catch {}
+    function init(){
+      outEl = document.getElementById('out');
+      inEl = document.getElementById('in');
+      inEl.addEventListener('keydown', (ev) => {
+        const seq = keyToSeq(ev);
+        if (seq) { ev.preventDefault(); send(seq); }
+      });
+      document.body.addEventListener('click', () => inEl.focus());
+      const handler = (e) => { try { const cfg = JSON.parse(e.data); startWs(cfg); } catch(err){ write('\n[config error]'); rnpost({type:'error', message:String(err)});} };
+      window.addEventListener('message', handler, { once:true });
+      document.addEventListener('message', handler, { once:true });
+      window.startWithConfig = (cfg) => { try { startWs(cfg); } catch(e){ write('\n[start error]'); rnpost({type:'error', message:String(e)});} };
+      write('Ready. Tap to focus and type.\n');
     }
     window.onload = init;
   </script>
 </head>
 <body>
-  <div id="terminal"></div>
-  <div id="fallback" style="display:none"></div>
+  <div id="out"></div>
+  <div id="bar">
+    <input id="in" placeholder="Type here…" />
+    <div id="hint">Enter sends, ⌫ backspace, Ctrl+C</div>
+  </div>
 </body>
 </html>`;
 }
