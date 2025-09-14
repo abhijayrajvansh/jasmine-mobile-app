@@ -16,7 +16,8 @@
     "doctor": "npx expo-doctor",
     "lint": "expo lint",
     "generate-apk-file": "eas build --platform android --local --profile preview",
-    "generate-ipa-file": "echo prebuild first then open ios xcworkspace and change the run scheme to release and build for local iphone then check Xcode-DerivedData-AppName-Build-Products-ReleaseIphoneOS** folder for released app file then convert wrap that into zip -r appname.ipa Payload file."
+    "generate-ipa-file": "echo prebuild first then open ios xcworkspace and change the run scheme to release and build for local iphone then check Xcode-DerivedData-AppName-Build-Products-ReleaseIphoneOS** folder for released app file then convert wrap that into zip -r appname.ipa Payload file.",
+    "bridge:ssh": "node scripts/ws-ssh-bridge.js"
   },
   "dependencies": {
     "@expo/vector-icons": "^15.0.2",

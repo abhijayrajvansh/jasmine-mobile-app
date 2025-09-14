@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { KeyboardAvoidingView, Platform, StyleSheet, TouchableOpacity, View as RNView, Switch } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Text, View, TextInput } from '@/components/Themed';
+import { isNativeSshAvailable } from '@/lib/nativeSsh';
 import { useLocalSearchParams } from 'expo-router';
 
 export default function TerminalConnectScreen() {
@@ -11,7 +12,7 @@ export default function TerminalConnectScreen() {
   const [port, setPort] = useState(params.port ?? '22');
   const [username, setUsername] = useState(params.username ?? '');
   const [password, setPassword] = useState('');
-  const [useDirect, setUseDirect] = useState(true);
+  const [useDirect, setUseDirect] = useState(isNativeSshAvailable());
   const [bridgeUrl, setBridgeUrl] = useState('ws://localhost:8080/ws/ssh');
 
   const valid = useMemo(() => host.trim().length > 0 && username.trim().length > 0 && password.length > 0 && /^\d+$/.test(port), [host, port, username, password]);
